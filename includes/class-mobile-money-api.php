@@ -1,153 +1,175 @@
 <?php
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Quitter si accès direct
+    exit; // Quitter si accès direct
 }
 
 class Mobile_Money_API {
 
-	/**
-	 * Make a request to the SCKALER API.
-	 */
-	private static function make_request( $method, $endpoint, $body = null, $token = null ) {
-		$url = 'https://pay.sckaler.cloud/api' . $endpoint;
-		$args = array(
-			'method'  => $method,
-			'headers' => array(
-				'Content-Type' => 'application/json',
-			),
-		);
+    // URL de base de l'API SCKALER
+    private static $base_url = 'https://pay.sckaler.cloud/api';
 
-		if ( $token ) {
-			$args['headers']['Authorization'] = 'Bearer ' . $token;
-		}
+    /**
+     * Effectue une requête vers l'API SCKALER.
+     *
+     * @param string $method Méthode HTTP (GET, POST, PUT, DELETE).
+     * @param string $endpoint Point de terminaison de l'API.
+     * @param array|null $body Corps de la requête (optionnel).
+     * @param string|null $token Jeton d'authentification (optionnel).
+     * @return array Réponse de l'API sous forme de tableau associatif.
+     */
+    private static function make_request( $method, $endpoint, $body = null, $token = null ) {
+        $url = self::$base_url . $endpoint;
+        $args = array(
+            'method'  => $method,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'Authorization' => $token ? 'Bearer ' . $token : '',
+            ),
+            'body' => $body ? json_encode( $body ) : null,
+            'timeout' => 45, // Délai d'attente en secondes
+        );
 
-		if ( $body ) {
-			$args['body'] = json_encode( $body );
-		}
+        $response = wp_remote_request( $url, $args );
 
-		$response = wp_remote_request( $url, $args );
+        // Vérifie les erreurs de la requête
+        if ( is_wp_error( $response ) ) {
+            return array( 'error' => true, 'message' => $response->get_error_message() );
+        }
 
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
+        $status_code = wp_remote_retrieve_response_code( $response );
+        $response_body = wp_remote_retrieve_body( $response );
 
-		$body = wp_remote_retrieve_body( $response );
+        // Vérifie le code de statut HTTP
+        if ( $status_code >= 200 && $status_code < 300 ) {
+            return json_decode( $response_body, true );
+        } else {
+            return array( 'error' => true, 'status_code' => $status_code, 'response_body' => $response_body );
+        }
+    }
 
-		return json_decode( $body, true );
-	}
+    /**
+     * Génère un jeton d'authentification.
+     *
+     * @param string $email Email de l'utilisateur.
+     * @param string $password Mot de passe de l'utilisateur.
+     * @param string|null $accountName Nom du compte (optionnel).
+     * @return array|string Jeton d'authentification ou détails de l'erreur.
+     */
+    public static function generate_token( $email, $password, $accountName = null ) {
+        $body = array(
+            'email' => $email,
+            'password' => $password,
+        );
 
-	/**
-	 * Generate an authorization token.
-	 */
-	public static function generate_token( $email, $password, $accountName = null ) {
-		$body = array(
-			'email'    => $email,
-			'password' => $password,
-		);
+        if ( $accountName ) {
+            $body['accountName'] = $accountName;
+        }
 
-		if ( $accountName ) {
-			$body['accountName'] = $accountName;
-		}
+        $response = self::make_request( 'POST', '/token', $body );
 
-		return self::make_request( 'POST', '/token', $body );
-	}
+        if ( isset( $response['token'] ) ) {
+            return $response['token'];
+        } else {
+            return $response; // Retourne les détails de l'erreur
+        }
+    }
 
-	/**
-	 * Initialize a payment request.
-	 */
-	public static function send_payment_request( $token, $payment_data ) {
-		return self::make_request( 'POST', '/collection', $payment_data, $token );
-	}
+    /**
+     * Envoie une demande de paiement.
+     *
+     * @param string $provider Fournisseur de services mobiles.
+     * @param string $country Code du pays.
+     * @param string $tel Numéro de téléphone.
+     * @param float $amount Montant à collecter.
+     * @param string $description Description de la transaction.
+     * @param string $currency Devise de la transaction.
+     * @param string $token Jeton d'authentification.
+     * @return array Réponse de l'API.
+     */
+    public static function send_payment_request( $provider, $country, $tel, $amount, $description, $currency, $token ) {
+        $body = array(
+            'provider' => $provider,
+            'country' => $country,
+            'tel' => $tel,
+            'amount' => $amount,
+            'description' => $description,
+            'currency' => $currency,
+        );
 
-	/**
-	 * Confirm a payment with a confirmation code.
-	 */
-	public static function confirm_payment( $token, $transaction_id, $confirmation_code ) {
-		$body = array(
-			'transaction_id'     => $transaction_id,
-			'confirmation_code'  => $confirmation_code,
-		);
+        return self::make_request( 'POST', '/collection', $body, $token );
+    }
 
-		return self::make_request( 'PUT', '/collection/confirm', $body, $token );
-	}
+    /**
+     * Confirme un paiement.
+     *
+     * @param string $transaction_id Identifiant de la transaction.
+     * @param string $confirmation_code Code de confirmation envoyé au client.
+     * @param string $token Jeton d'authentification.
+     * @return array Réponse de l'API.
+     */
+    public static function confirm_payment( $transaction_id, $confirmation_code, $token ) {
+        $body = array(
+            'transaction_id' => $transaction_id,
+            'confirmation_code' => $confirmation_code,
+        );
 
-	/**
-	 * Initiate a disbursement request.
-	 */
-	public static function initiate_disbursement( $token, $disbursement_data ) {
-		return self::make_request( 'POST', '/disbursement', $disbursement_data, $token );
-	}
+        return self::make_request( 'PUT', '/collection/confirm', $body, $token );
+    }
 
-	/**
-	 * Get the status of a transaction.
-	 */
-	public static function get_transaction_status( $token, $transaction_id ) {
-		return self::make_request( 'GET', '/transaction/status/' . $transaction_id, null, $token );
-	}
+    /**
+     * Initialise une demande de décaissement.
+     *
+     * @param string $provider Fournisseur de services mobiles.
+     * @param string $country Code du pays.
+     * @param string $tel Numéro de téléphone.
+     * @param float $amount Montant à transférer.
+     * @param string $description Description de la transaction.
+     * @param string $currency Devise de la transaction.
+     * @param string $token Jeton d'authentification.
+     * @return array Réponse de l'API.
+     */
+    public static function initiate_disbursement( $provider, $country, $tel, $amount, $description, $currency, $token ) {
+        $body = array(
+            'provider' => $provider,
+            'country' => $country,
+            'tel' => $tel,
+            'amount' => $amount,
+            'description' => $description,
+            'currency' => $currency,
+        );
 
-	/**
-	 * Get the list of supported countries.
-	 */
-	public static function get_supported_countries() {
-		$response = wp_remote_get( 'https://pay.sckaler.cloud/api/data/countries' );
+        return self::make_request( 'POST', '/disbursement', $body, $token );
+    }
 
-		if ( is_wp_error( $response ) ) {
-			return array();
-		}
+    /**
+     * Obtient le statut d'une transaction.
+     *
+     * @param string $transaction_id Identifiant de la transaction.
+     * @param string $token Jeton d'authentification.
+     * @return array Réponse de l'API.
+     */
+    public static function get_transaction_status( $transaction_id, $token ) {
+        return self::make_request( 'GET', '/transaction/status/' . $transaction_id, null, $token );
+    }
 
-		$body = wp_remote_retrieve_body( $response );
-		$countries = json_decode( $body, true );
+    /**
+     * Récupère la liste des pays pris en charge.
+     *
+     * @return array Réponse de l'API.
+     */
+    public static function get_supported_countries() {
+        return self::make_request( 'GET', '/data/countries' );
+    }
 
-		if ( ! is_array( $countries ) ) {
-			return array();
-		}
+    /**
+     * Récupère la liste des fournisseurs pris en charge.
+     *
+     * @return array Réponse de l'API.
+     */
+    public static function get_supported_providers() {
+        return self::make_request( 'GET', '/data/providers' );
+    }
 
-		// Assuming API returns array of country codes
-		$country_names = array(
-			'BJ' => 'Bénin',
-			'CI' => 'Côte d\'Ivoire',
-			'BF' => 'Burkina Faso',
-			'ML' => 'Mali',
-			'SN' => 'Sénégal',
-		);
-
-		$supported_countries = array();
-		foreach ( $countries as $country_code ) {
-			if ( isset( $country_names[ $country_code ] ) ) {
-				$supported_countries[ $country_code ] = $country_names[ $country_code ];
-			}
-		}
-
-		return $supported_countries;
-	}
-
-	/**
-	 * Get the list of supported providers.
-	 */
-	public static function get_supported_providers() {
-		$response = wp_remote_get( 'https://pay.sckaler.cloud/api/data/providers' );
-
-		if ( is_wp_error( $response ) ) {
-			return array();
-		}
-
-		$body = wp_remote_retrieve_body( $response );
-		$providers_list = json_decode( $body, true );
-
-		if ( ! is_array( $providers_list ) ) {
-			return array();
-		}
-
-		$providers_by_country = array();
-
-		foreach ( $providers_list as $provider ) {
-			if ( isset( $provider['country'] ) && isset( $provider['name'] ) ) {
-				$providers_by_country[ $provider['country'] ][] = $provider['name'];
-			}
-		}
-
-		return $providers_by_country;
-	}
 }
 ?>
