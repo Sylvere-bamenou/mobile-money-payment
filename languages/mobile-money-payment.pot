@@ -1,0 +1,43 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: Paiement Mobile Money\n"
+
+msgid "Pays"
+msgstr ""
+
+msgid "Sélectionnez un pays"
+msgstr ""
+
+msgid "Réseau mobile"
+msgstr ""
+
+msgid "Sélectionnez un fournisseur"
+msgstr ""
+
+msgid "Numéro de téléphone"
+msgstr ""
+
+msgid "Veuillez sélectionner un pays."
+msgstr ""
+
+msgid "Veuillez sélectionner un réseau mobile."
+msgstr ""
+
+msgid "Veuillez entrer votre numéro de téléphone."
+msgstr ""
+
+msgid "Paiement Mobile Money"
+msgstr ""
+
+msgid "Payez via Mobile Money en utilisant SCKALER."
+msgstr ""
+
+msgid "Token API"
+msgstr ""
+
+msgid "Activer/Désactiver"
+msgstr ""
+
+msgid "Activer la passerelle de paiement Mobile Money"
+msgstr ""
