@@ -1,0 +1,608 @@
+openapi: "3.0.0"
+info:
+  version: "1.0.0"
+  title: "SCKALER-API"
+  description: >
+    The Payment API allows for seamless Mobile Money payments across various West African countries.
+    Our service supports transactions in BENIN, IVORY COAST, BURKINA FASO, MALI, and SENEGAL.
+    We partner with numerous providers, including MTV, Moov, Celtis, Wave, Orange, and Free, 
+    ensuring extensive coverage and reliability.
+
+    Our API is designed to be robust and dependable, offering the best rates on the market.
+    With a commitment to excellence, we ensure that your payments are processed quickly and securely.
+    Whether you are sending money to family or making business transactions, our Payment API provides
+    the most efficient and cost-effective solution for all your Mobile Money needs.
+
+servers:
+  - url: "https://pay.sckaler.cloud/api"
+    description: "Server address"
+
+paths:
+  /token:
+    post:
+      summary: >
+        Generate an authorization token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: 
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  example: "email@email.com"
+                password:
+                  type: string
+                  example: "Password"
+                accountName:
+                  description: not Required, default to your main account
+                  type: string
+                  example: "This field is optional"
+                
+                  
+      responses:
+        "200":
+          description: Successful response with a token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: 
+                    type: string
+                
+          
+  /collection:
+    post:
+      summary: >
+        Initialise a payment request to begin the transaction process using our Payment API.
+      parameters:
+        - name: Authorization
+          in: header
+          description: Bearer token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewRequestBody"
+      responses:
+        "200":
+          description: Request successfully initiated with a transaction created with status 'PENDING'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        "401":
+          description: Bad request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestBody"
+        "500":
+          description: Unexpected error / Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      callbacks:
+        transaction_status:
+          "callback_url configured on the dashboard":
+            post:
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      properties:
+                        transaction_id:
+                          type: string
+                          description: Transaction identifier
+                        status:
+                          type: string
+                          enum:
+                            - SUCCESS
+                            - FAILED
+                            - PENDING
+                        failureReason:
+                          type: string
+                          description: Failure reason if transaction failed
+              responses:
+                "200":
+                  description: Your server returns this code. Only request will be sent.
+  /collection/confirm:
+    put:
+      summary: >
+        Confirm a payment from Orange Money / Wave with a confirmation_code provided by the client.
+      parameters:
+        - name: Authorization
+          in: header
+          description: Bearer token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: True
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transaction_id:
+                  type: string
+                  description: Transaction identifier
+                confirmation_code:
+                  type: string
+                  description: OTP sent to the client by the provider
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - SUCCESS
+                      - FAILED
+                      - PENDING
+          
+  /disbursement:
+    post:
+      summary: >
+        Initialise a disbursement request to start the process of transferring funds using our Payment API.
+      
+      parameters:
+        - name: Authorization
+          in: header
+          description: Bearer token
+          required: true
+          schema:
+            type: string
+      
+      requestBody:
+        required: true
+        description: >
+          The request body depends on the country and provider.
+          For all the request in Benin(BJ), you must use the first one.
+  
+          For the others countries, use the alternative described below
+          as OtherTransfert.
+        content:
+          application/json:
+          
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/OtherTransfert"
+                - $ref: "#/components/schemas/NewRequestBody"
+      responses:
+        "200":
+          description: Request successfully initiated with a transaction created with status 'PENDING'
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        "401":
+          description: Bad request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestBody"
+        "500":
+          description: Unexpected error / Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      callbacks:
+        transaction_status:
+          "callback_url configured on the dashboard":
+            post:
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      properties:
+                        transaction_id:
+                          type: string
+                          description: Transaction identifier
+                        status:
+                          type: string
+                          enum:
+                            - SUCCESS
+                            - FAILED
+                            - PENDING
+                        failureReason:
+                          type: string
+                          description: Failure reason if transaction failed
+              responses:
+                "200":
+                  description: Your server returns this code. Only request will be sent.
+  
+  /collection/mtn:
+    post:
+      summary: Initialize a mtn debit request
+      description: This endpoint will be deprecated. We recommend switching to the /collection endpoint
+      deprecated: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OldRequestBody"
+      responses:
+        "200":
+          description: Request successfully initiated with PENDING transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        "401":
+          description: Bad request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestBody"
+        "500":
+          description: Unexpected error / Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+ 
+  /collection/moov:
+    post:
+      summary: Initialize a moov debit request
+      description: This endpoint will be deprecated. We recommend switching to the /collection endpoint
+      deprecated: true
+      parameters:
+        - name: Authorization
+          in: header
+          description: Bearer token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OldRequestBody"
+      responses:
+        "200":
+          description: Request successfully initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        401:
+          description: Bad request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestBody"
+        500:
+          description: Unexpected error / Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  
+  /disbursement/mtn:
+    post:
+      summary: Initialize a mtn transfert request
+      description: This endpoint will be deprecated. We recommend switching to the /disbursement endpoint
+      deprecated: true
+      parameters:
+        - name: Authorization
+          in: header
+          description: Bearer token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OldRequestBody"
+      responses:
+        "200":
+          description: Request successfully initiated with PENDING transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        401:
+          description: Bad request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestBody"
+        500:
+          description: Unexpected error / Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+ 
+  /disbursement/moov:
+    post:
+      summary: Initialize a moov transfert request
+      description: This endpoint will be deprecated. We recommend switching to the /disbursement endpoint
+      deprecated: true
+      parameters:
+        - name: Authorization
+          in: header
+          description: Bearer token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OldRequestBody"
+      responses:
+        "200":
+          description: Request successfully initiated with PENDING transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        401:
+          description: Bad request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestBody"
+        500:
+          description: Unexpected error / Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+ 
+  /transaction/status/{transaction_id}:
+    get:
+      summary: Get the status of a given transaction
+      parameters:
+        - name: transaction_id
+          in: path
+          required: true
+          description: Transaction_id sent from a collection or disbursement response.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionStatus"
+        "401":
+          description: Unauthorized request.
+
+  /data/countries:
+    get:
+      summary: List of supported countries
+      responses:
+        "200":
+          description: successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/providers"
+  
+  /data/providers:
+    get:
+      summary: List of supported providers
+      responses:
+        "200":
+          description: successful response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/countries"
+
+components:
+  schemas:
+    providers:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            description: Name of the country
+          code:
+            description: Country code
+
+    countries:
+      type: array
+      items:
+        type: string
+        example: ["BJ", "CI", "BF", "CM", "SN", "ML"]
+        
+    NewRequestBody:
+      type: object
+      properties:
+        provider:
+          type: string
+          description: Name of the provider, "mtn", "moov", "togocell", "orange", "free", "emoney", "wave", "mobicash"
+
+        country:
+          type: string
+          description: Short code of the country "BJ" for instance. A list of supported countries is available in the API
+        tel:
+          type: string
+          description: The mobile number from which the amount will be collected
+
+        amount:
+          type: number
+          description: Amount to be collected
+
+        description:
+          type: string
+          description: A small description of the purpose of the transaction
+        
+        currency:
+          type: string
+          description: Currency 
+          example: XOF
+          
+      required:
+        - "provider"
+        - "country"
+        - "tel"
+        - "amount"
+        - "description"
+        - "currency"
+
+    TransactionStatus:
+      type: object
+      properties:
+        transaction_id:
+          type: string
+          description: Transaction identifier
+        status:
+          type: string
+          enum:
+            - SUCCESS
+            - FAILED
+            - PENDING
+    Error:
+      type: object
+      properties:
+        msg:
+          description: ""
+    BadRequestBody:
+      type: object
+      properties:
+        msg:
+          description: "Bad request! Check the body of your request."
+    Response:
+      type: object
+      properties:
+        msg:
+          description: Message about the status
+          type: string
+        status:
+          type: string
+          enum:
+            - SUCCESS
+            - FAILED
+            - PENDING
+        transaction_id:
+          description: Id of the transaction
+    OldRequestBody:
+      type: object
+      properties:
+        tel:
+          type: string
+        amount:
+          type: string
+        description:
+          type: string
+      required:
+        - tel
+        - amount
+        - description
+    OtherTransfert:
+      type: object
+      required:
+        - amount
+        - description
+        - tel
+        - currency
+        - country
+        - provider
+        - destination
+        - origin
+      properties:
+        amount:
+          type: number
+          format: float
+          minimum: 0
+          description: Montant de transfert
+          example: 100.50
+        description:
+          type: string
+          description: Description du transfert
+          example: "Paiement de facture"
+        tel:
+          type: string
+          description: Numéro de téléphone
+          example: "22512345678"
+        currency:
+          type: string
+          description: Devise
+          example: "XOF"
+        country:
+          type: string
+          description: Pays
+          example: "CI"
+        provider:
+          type: string
+          description: Provider
+          example: "mtn"
+        destination:
+          type: object
+          required:
+            - country
+            - recipientName
+            - msisdn
+            - provider
+          properties:
+            country:
+              type: string
+              description: Pays de destination
+              example: "CI"
+            recipientName:
+              type: string
+              description: Nom du destinataire
+              example: "John Doe"
+            msisdn:
+              type: string
+              description: Numéro de téléphone du destinataire
+              example: "22512345678"
+            provider:
+              type: string
+              description: Provider de destination
+              example: "mtn"
+        origin:
+          type: object
+          required:
+            - name
+            - country
+          properties:
+            name:
+              type: string
+              description: Nom de l'émetteur
+              example: "Jane Doe"
+            country:
+              type: string
+              description: Pays de l'émetteur
+              example: "BJ"
+        
+  
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+
+security:
+  - ApiKey : []
