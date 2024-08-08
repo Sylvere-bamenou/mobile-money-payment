@@ -1,11 +1,19 @@
 === Paiement Mobile Money ===
+
 Contributors: Sylvere BAMENOU
+
 Tags: woocommerce, mobile money, payment gateway, sckaler, payment
+
 Requires at least: 5.0
+
 Tested up to: 6.3
+
 Requires PHP: 7.2
+
 Stable tag: 1.0.0
+
 License: GPLv2 or later
+
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Une passerelle de paiement WooCommerce personnalisée pour les paiements Mobile Money utilisant l'API SCKALER.
